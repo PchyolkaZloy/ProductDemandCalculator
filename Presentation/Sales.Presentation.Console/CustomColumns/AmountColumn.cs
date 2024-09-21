@@ -1,7 +1,7 @@
 using Spectre.Console;
 using Spectre.Console.Rendering;
 
-namespace Sales.Presentation.Console.Column;
+namespace Sales.Presentation.Console.CustomColumns;
 
 public sealed class AmountColumn : ProgressColumn
 {
@@ -11,14 +11,6 @@ public sealed class AmountColumn : ProgressColumn
 
     public override IRenderable Render(RenderOptions options, ProgressTask task, TimeSpan deltaTime)
     {
-        var currentValue = task.Value;
-        var maxValue = task.MaxValue;
-
-        if (Math.Abs(currentValue - maxValue) < 0.001)
-        {
-            Style = Color.Green3;
-        }
-
-        return new Text($"{currentValue}/{maxValue}", Style ?? Style.Plain);
+        return new Text($"{task.Value}/{task.MaxValue}", Style ?? Style.Plain);
     }
 }

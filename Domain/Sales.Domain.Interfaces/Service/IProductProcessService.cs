@@ -2,7 +2,7 @@ namespace Sales.Domain.Interfaces.Service;
 
 public interface IProductProcessService
 {
-    Task StartProcessingAsync();
+    Task StartProcessingAsync(int parallelismDegree, CancellationToken cancellationToken);
 
-    void CancelProcessing();
+    void UpdateParallelismDegree(int newParallelismDegree);
 }

@@ -2,7 +2,7 @@ using System.Threading.Channels;
 using Sales.Domain.Interfaces.Service;
 using Sales.Domain.Models.Products;
 
-namespace Sales.Application.Services.Workers;
+namespace Sales.Application.Services.Services;
 
 public sealed class ProductProcessWorker(
     IProductCalculator calculator,
@@ -16,8 +16,9 @@ public sealed class ProductProcessWorker(
         var productResult = calculator.CalculateDemand(productInfo);
         progressTracker.IncrementCompleted();
 
-        await Task.Delay(10, cancellationToken);
-
+        // Задержка для имитации длительных вычислений
+        await Task.Delay(1, cancellationToken);
+        
         await channel.Writer.WriteAsync(productResult, cancellationToken);
     }
 }

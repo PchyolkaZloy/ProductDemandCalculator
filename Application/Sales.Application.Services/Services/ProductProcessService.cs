@@ -1,6 +1,4 @@
 using System.Threading.Channels;
-using Microsoft.Extensions.Options;
-using Sales.Application.Services.Config;
 using Sales.Domain.Interfaces.FileIO;
 using Sales.Domain.Interfaces.Service;
 using Sales.Domain.Models.Products;
@@ -14,9 +12,7 @@ public sealed class ProductProcessService : IProductProcessService
     private readonly Channel<ProductInfo> _channelProductInfo;
     private readonly Channel<ProductResult> _channelProductResult;
     private readonly IProductProcessWorker _productProcessWorker;
-    private readonly IOptionsMonitor<AppSettingsConfig> _optionsMonitor;
-    private readonly CancellationTokenSource _cts;
-    private readonly SemaphoreSlim _semaphore;
+    private SemaphoreSlim _semaphore;
     private int _currentParallelismDegree;
 
     public ProductProcessService(
@@ -24,8 +20,7 @@ public sealed class ProductProcessService : IProductProcessService
         IFileWriter fileWriter,
         Channel<ProductInfo> channelProductInfo,
         Channel<ProductResult> channelProductResult,
-        IProductProcessWorker productProcessWorker,
-        IOptionsMonitor<AppSettingsConfig> optionsMonitor
+        IProductProcessWorker productProcessWorker
     )
     {
         _fileReader = fileReader;
@@ -33,72 +28,54 @@ public sealed class ProductProcessService : IProductProcessService
         _channelProductInfo = channelProductInfo;
         _channelProductResult = channelProductResult;
         _productProcessWorker = productProcessWorker;
-        _optionsMonitor = optionsMonitor;
-
-        const int maxParallelismDegree = 100;
-        _currentParallelismDegree = _optionsMonitor.CurrentValue.ParallelismDegree > maxParallelismDegree
-            ? maxParallelismDegree
-            : _optionsMonitor.CurrentValue.ParallelismDegree;
-        _semaphore = new SemaphoreSlim(_currentParallelismDegree, maxParallelismDegree);
-        _cts = new CancellationTokenSource();
-
-        _optionsMonitor.OnChange(UpdateParallelismDegree);
     }
 
 
-    public async Task StartProcessingAsync()
+    public async Task StartProcessingAsync(int parallelismDegree, CancellationToken cancellationToken)
     {
-        var readTask = _fileReader.ReadProductInfosAsync(_channelProductInfo.Writer, _cts.Token);
-        var writeTask = _fileWriter.WriteProductResultsAsync(_channelProductResult.Reader, _cts.Token);
+        cancellationToken.ThrowIfCancellationRequested();
+        
+        const int maxParallelismDegree = 100;
+
+        _currentParallelismDegree = parallelismDegree;
+        _semaphore = new SemaphoreSlim(_currentParallelismDegree, maxParallelismDegree);
+
+        var readTask = _fileReader.ReadProductInfosAsync(_channelProductInfo.Writer, cancellationToken);
+        var writeTask = _fileWriter.WriteProductResultsAsync(_channelProductResult.Reader, cancellationToken);
 
         var processingTask = Task.Run(async () =>
             {
-                await foreach (var productInfo in _channelProductInfo.Reader.ReadAllAsync(_cts.Token))
+                await foreach (var productInfo in _channelProductInfo.Reader.ReadAllAsync(cancellationToken))
                 {
-                    await _semaphore.WaitAsync(_cts.Token);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await _semaphore.WaitAsync(cancellationToken);
 
-                    _ = Task.Run(async () =>
-                        {
-                            try
-                            {
-                                await _productProcessWorker.ProcessAsync(productInfo, _cts.Token);
-                            }
-                            finally
-                            {
-                                _semaphore.Release();
-                            }
-                        },
-                        _cts.Token
-                    );
+                    _ = CalculateProcessAsync(_productProcessWorker, productInfo, _semaphore, cancellationToken);
                 }
             },
-            _cts.Token
+            cancellationToken
         );
 
         await processingTask;
 
-        // Не костыль, а КОСТЫЛИЩЕ
+        // Не костыль, а КОСТЫЛИЩЕ (дожидаемся, пока внутренние задачи processingTask закончатся)
         while (_semaphore.CurrentCount < _currentParallelismDegree)
         {
-            await Task.Delay(50);
+            await Task.Delay(50, cancellationToken);
         }
 
         _channelProductResult.Writer.Complete();
         await Task.WhenAll(readTask, writeTask);
     }
 
-    public void CancelProcessing()
-    {
-        _cts.Cancel();
-    }
-
-    private void UpdateParallelismDegree(AppSettingsConfig newSettingsConfig)
+    public void UpdateParallelismDegree(int newParallelismDegree)
     {
         const int maxParallelismDegree = 100;
 
-        var newParallelismDegree = newSettingsConfig.ParallelismDegree is < 1 or > maxParallelismDegree
-            ? maxParallelismDegree
-            : newSettingsConfig.ParallelismDegree;
+        if (newParallelismDegree is < 1 or > maxParallelismDegree)
+        {
+            newParallelismDegree = maxParallelismDegree;
+        }
 
         if (newParallelismDegree > _currentParallelismDegree)
         {
@@ -113,5 +90,24 @@ public sealed class ProductProcessService : IProductProcessService
         }
 
         _currentParallelismDegree = newParallelismDegree;
+    }
+
+
+    private static async Task CalculateProcessAsync(
+        IProductProcessWorker productProcessWorker,
+        ProductInfo productInfo,
+        SemaphoreSlim semaphore,
+        CancellationToken cancellationToken
+    )
+    {
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await productProcessWorker.ProcessAsync(productInfo, cancellationToken);
+        }
+        finally
+        {
+            semaphore.Release();
+        }
     }
 }
