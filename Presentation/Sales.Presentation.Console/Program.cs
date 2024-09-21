@@ -4,7 +4,8 @@ using Sales.Application.Services.Extensions;
 using Sales.Infrastructure.FileIO.Extensions;
 using Sales.Presentation.Console.Config;
 using Sales.Presentation.Console.Extensions;
-using Sales.Presentation.Console.Runners;
+using Sales.Presentation.Console.Scenarios;
+using Sales.Presentation.Console.Validators;
 using Spectre.Console;
 
 namespace Sales.Presentation.Console;
@@ -13,9 +14,14 @@ public static class Program
 {
     public static async Task Main(string[] args)
     {
-        // TODO проверка args
-        const string configPath =
-            "/home/pchz/JetBrains/projects/RiderProjects/Ozon/Homeworks/homework-3/Presentation/Sales.Presentation.Console/appsettings.json";
+        if (args.Length == 0 || string.IsNullOrWhiteSpace(args[0]))
+        {
+            AnsiConsole.Markup(
+                "[bold red]Error:[/] You must provide the path to the configuration file as an argument.");
+            return;
+        }
+
+        var configPath = args[0];
 
         IConfiguration configuration = new ConfigurationBuilder()
             .AddJsonFile(configPath, optional: true, reloadOnChange: true)
@@ -25,12 +31,20 @@ public static class Program
         var appOptions = new AppSettingsConfig();
         configuration.GetSection("AppSettings").Bind(appOptions);
 
+        var validator = new AppSettingsConfigValidator();
+        var validationResult = await validator.ValidateAsync(appOptions);
+        if (!validationResult.IsValid)
+        {
+            ErrorScenario.ShowValidationErrors(validationResult.Errors);
+
+            return;
+        }
+
         var services = new ServiceCollection();
 
         services.AddOptions();
         services.Configure<AppSettingsConfig>(configuration.GetSection("AppSettings"));
 
-        // TODO проверка AppSettingsConfig
 
         services
             .AddApplicationServices(appOptions.ChannelReaderCapacityInMb, appOptions.ChannelWriterCapacityInMb)
@@ -39,15 +53,15 @@ public static class Program
 
         var serviceProvider = services.BuildServiceProvider();
         var cts = serviceProvider.GetRequiredService<CancellationTokenSource>();
-        var consoleScenarioRunner = serviceProvider.GetRequiredService<ConsoleScenarioRunner>();
+        var progressScenario = serviceProvider.GetRequiredService<ProgressScenario>();
 
         System.Console.CancelKeyPress += (s, eventArgs) =>
         {
             AnsiConsole.Markup("[red]Cancelling...[/]");
-            consoleScenarioRunner.CancelProcessing();
+            cts.Cancel();
             eventArgs.Cancel = true;
         };
 
-        await consoleScenarioRunner.ExecuteAsync(cts.Token);
+        await progressScenario.RunAsync(cts.Token);
     }
 }

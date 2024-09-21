@@ -23,5 +23,13 @@ public sealed class AppSettingsConfigValidator : AbstractValidator<AppSettingsCo
         RuleFor(c => c.OutputFilePath)
             .NotNull()
             .NotEmpty();
+
+        RuleFor(c => c.ChannelReaderCapacityInMb)
+            .NotNull()
+            .GreaterThan(0);
+
+        RuleFor(c => c.ChannelWriterCapacityInMb)
+            .NotNull()
+            .GreaterThan(0);
     }
 }

@@ -6,7 +6,7 @@ namespace Sales.Presentation.Console.Scenarios;
 
 public sealed class ErrorScenario
 {
-    public void ShowValidationErrors(List<ValidationFailure> errors)
+    public static void ShowValidationErrors(List<ValidationFailure> errors)
     {
         var json = new JsonText(
             """
@@ -20,8 +20,8 @@ public sealed class ErrorScenario
                 }
             }
             """);
-        
-        AnsiConsole.MarkupLine("[bold red]Validation failed with the following errors:[/]");
+
+        AnsiConsole.Markup("[bold red]AppSettings configuration is invalid:[/]");
         foreach (var error in errors)
         {
             AnsiConsole.MarkupLine($"[red]• {error.ErrorMessage}[/]");
@@ -29,7 +29,7 @@ public sealed class ErrorScenario
 
         AnsiConsole.Write(
             new Panel(json)
-                .Header("Config JSON [underline red]must look[/] like:")
+                .Header("Config [underline red]have to look[/] like template:")
                 .Collapse()
                 .RoundedBorder()
                 .BorderColor(Color.Green));

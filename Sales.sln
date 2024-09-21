@@ -16,13 +16,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sales.Application.Services"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sales.Presentation.Console", "Presentation\Sales.Presentation.Console\Sales.Presentation.Console.csproj", "{98FF7C8B-C116-4EA0-A452-306B088F84D3}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{4C7486B7-13AA-4F16-B37D-BAE4CF47482E}"
-	ProjectSection(SolutionItems) = preProject
-		docker-compose.yml = docker-compose.yml
-	EndProjectSection
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{F49E5161-309B-4B0F-A4C5-D938F38045A7}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sales.Infrastructure.FileIO", "Infrastructure\Sales.Infrastructure.FileIO\Sales.Infrastructure.FileIO.csproj", "{08401C99-E615-4357-B3A8-E9FDE293485C}"
 EndProject
 Global
