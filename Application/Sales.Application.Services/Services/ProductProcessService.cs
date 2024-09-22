@@ -58,7 +58,7 @@ public sealed class ProductProcessService : IProductProcessService
 
         await processingTask;
 
-        // Не костыль, а КОСТЫЛИЩЕ (дожидаемся, пока внутренние задачи processingTask закончатся)
+        // Дожидаемся, пока внутренние задачи processingTask закончатся
         while (_semaphore.CurrentCount < _currentParallelismDegree)
         {
             await Task.Delay(50, cancellationToken);

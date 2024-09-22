@@ -15,9 +15,6 @@ public sealed class ProductProcessWorker(
     {
         var productResult = calculator.CalculateDemand(productInfo);
         progressTracker.IncrementCompleted();
-
-        // Задержка для имитации длительных вычислений
-        await Task.Delay(1, cancellationToken);
         
         await channel.Writer.WriteAsync(productResult, cancellationToken);
     }
