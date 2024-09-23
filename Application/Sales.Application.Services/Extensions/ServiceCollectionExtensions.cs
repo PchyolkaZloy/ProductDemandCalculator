@@ -20,11 +20,19 @@ public static class ServiceCollectionExtensions
 
         const int productInfoSizeInBytes = 24;
         var channelReaderCapacity = channelReaderCapacityInMb * 1024 * 1024 / productInfoSizeInBytes;
-        collection.AddSingleton(Channel.CreateBounded<ProductInfo>(channelReaderCapacity));
+        collection.AddSingleton(Channel.CreateBounded<ProductInfo>(
+            new BoundedChannelOptions(capacity: channelReaderCapacity)
+            {
+                SingleWriter = true
+            }));
 
         const int productResultSizeInBytes = 16;
         var channelWriterCapacity = channelWriterCapacityInMb * 1024 * 1024 / productResultSizeInBytes;
-        collection.AddSingleton(Channel.CreateBounded<ProductResult>(channelWriterCapacity));
+        collection.AddSingleton(Channel.CreateBounded<ProductResult>(
+            new BoundedChannelOptions(capacity: channelWriterCapacity)
+            {
+                SingleReader = true,
+            }));
 
         collection.AddSingleton<IProgressTracker, ProgressTracker>();
         collection.AddSingleton<IProductProcessService, ProductProcessService>();
