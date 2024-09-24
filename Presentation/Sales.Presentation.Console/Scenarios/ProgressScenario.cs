@@ -51,17 +51,18 @@ public sealed class ProgressScenario
                 .StartAsync(async ctx =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+
                     var readProgress = ctx.AddTask("[green]Read[/]")
                         .MaxValue(_tracker.MaxValue);
-                    var completeTask = ctx.AddTask("[green]Completed[/]").MaxValue(_tracker.MaxValue);
-                    var writeProgress =
-                        ctx.AddTask("[green]Wrote[/]")
-                            .MaxValue(_tracker.MaxValue);
+                    var completeTask = ctx.AddTask("[green]Completed[/]")
+                        .MaxValue(_tracker.MaxValue);
+                    var writeProgress = ctx.AddTask("[green]Wrote[/]")
+                        .MaxValue(_tracker.MaxValue);
 
 
                     while (!ctx.IsFinished)
                     {
-                        await Task.Delay(1, cancellationToken);
+                        await Task.Delay(50, cancellationToken);
                         readProgress.Value(_tracker.Read);
                         completeTask.Value(_tracker.Completed);
                         writeProgress.Value(_tracker.Wrote);
@@ -77,7 +78,7 @@ public sealed class ProgressScenario
             AnsiConsole.Markup("[red]Cancelled[/]");
         }
     }
-    
+
 
     private void UpdateParallelismDegree(AppSettingsConfig config)
     {
