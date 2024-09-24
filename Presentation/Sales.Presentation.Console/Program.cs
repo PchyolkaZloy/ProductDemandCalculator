@@ -62,6 +62,6 @@ public static class Program
             eventArgs.Cancel = true;
         };
 
-        await progressScenario.RunAsync(cts.Token);
+        await progressScenario.RunAsync(cts);
     }
 }

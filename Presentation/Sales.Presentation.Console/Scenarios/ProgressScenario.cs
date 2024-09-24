@@ -25,57 +25,69 @@ public sealed class ProgressScenario
         _optionsMonitor.OnChange(UpdateParallelismDegree);
     }
 
-    public async Task RunAsync(CancellationToken cancellationToken)
+    public async Task RunAsync(CancellationTokenSource cts)
     {
-        try
-        {
-            var serviceTask = _productProcessService.StartProcessingAsync(
-                _optionsMonitor.CurrentValue.ParallelismDegree,
-                cancellationToken
+        var consoleProgress = AnsiConsole
+            .Progress()
+            .AutoClear(false)
+            .HideCompleted(false)
+            .Columns(
+                new SpinnerColumn(),
+                new TaskDescriptionColumn(),
+                new ProgressBarColumn(),
+                new PercentageColumn(),
+                new ElapsedTimeColumn(),
+                new AmountColumn()
             );
 
-            var consoleProgress = AnsiConsole
-                .Progress()
-                .AutoClear(false)
-                .HideCompleted(false)
-                .Columns(
-                    new SpinnerColumn(),
-                    new TaskDescriptionColumn(),
-                    new ProgressBarColumn(),
-                    new PercentageColumn(),
-                    new ElapsedTimeColumn(),
-                    new AmountColumn()
-                );
+        var serviceTask = _productProcessService.StartProcessingAsync(
+            _optionsMonitor.CurrentValue.ParallelismDegree,
+            cts.Token
+        );
 
-            var consoleProgressTask = consoleProgress
-                .StartAsync(async ctx =>
+
+        var consoleProgressTask = consoleProgress
+            .StartAsync(async ctx =>
+            {
+                cts.Token.ThrowIfCancellationRequested();
+
+                var readProgress = ctx.AddTask("[green]Read[/]")
+                    .MaxValue(_tracker.MaxValue);
+                var completeTask = ctx.AddTask("[green]Completed[/]")
+                    .MaxValue(_tracker.MaxValue);
+                var writeProgress = ctx.AddTask("[green]Wrote[/]")
+                    .MaxValue(_tracker.MaxValue);
+
+
+                while (!ctx.IsFinished)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
+                    await Task.Delay(50, cts.Token);
+                    readProgress.Value(_tracker.Read);
+                    completeTask.Value(_tracker.Completed);
+                    writeProgress.Value(_tracker.Wrote);
+                }
 
-                    var readProgress = ctx.AddTask("[green]Read[/]")
-                        .MaxValue(_tracker.MaxValue);
-                    var completeTask = ctx.AddTask("[green]Completed[/]")
-                        .MaxValue(_tracker.MaxValue);
-                    var writeProgress = ctx.AddTask("[green]Wrote[/]")
-                        .MaxValue(_tracker.MaxValue);
+                return Task.CompletedTask;
+            });
 
-
-                    while (!ctx.IsFinished)
-                    {
-                        await Task.Delay(50, cancellationToken);
-                        readProgress.Value(_tracker.Read);
-                        completeTask.Value(_tracker.Completed);
-                        writeProgress.Value(_tracker.Wrote);
-                    }
-
-                    return Task.CompletedTask;
-                });
-
-            await Task.WhenAll(serviceTask, consoleProgressTask);
+        try
+        {
+            await serviceTask;
+            await consoleProgressTask;
         }
         catch (OperationCanceledException)
         {
             AnsiConsole.Markup("[red]Cancelled[/]");
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.Markup($"[red]Error occurred: {ex.Message.EscapeMarkup()}[/]");
+            await cts.CancelAsync();
+        }
+
+        finally
+        {
+            await cts.CancelAsync();
         }
     }
 

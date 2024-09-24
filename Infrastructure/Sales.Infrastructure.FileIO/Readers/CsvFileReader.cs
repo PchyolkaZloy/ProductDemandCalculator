@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Threading.Channels;
 using CsvHelper;
+using CsvHelper.Configuration;
 using Sales.Domain.Interfaces.FileIO;
 using Sales.Domain.Interfaces.Service;
 using Sales.Domain.Models.Products;
@@ -17,22 +18,53 @@ public sealed class CsvFileReader(IProgressTracker progressTracker, string fileP
         using var reader = new StreamReader(filePath);
         progressTracker.MaxValue = TotalLines(reader);
 
-        using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
-
-        await csv.ReadAsync();
-        csv.ReadHeader();
-
-        while (await csv.ReadAsync())
+        using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            PrepareHeaderForMatch = args => args.Header.ToLowerInvariant()
+        });
 
-            var productInfo = csv.GetRecord<ProductInfo>();
-            progressTracker.IncrementRead();
+        try
+        {
+            await csv.ReadAsync();
+            if (!csv.ReadHeader())
+            {
+                throw new InvalidOperationException("Invalid or missing CSV header.");
+            }
 
-            await channelWriter.WriteAsync(productInfo, cancellationToken);
+            var expectedHeaders = new[] { "id", "prediction", "stock" };
+            var actualHeaders = csv.HeaderRecord;
+
+            if (actualHeaders.Length != expectedHeaders.Length ||
+                !actualHeaders.SequenceEqual(expectedHeaders, StringComparer.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("CSV headers are incorrect.");
+            }
+
+            while (await csv.ReadAsync())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (csv.Context.Parser.RawRecord.Trim().Length == 0)
+                {
+                    continue;
+                }
+
+                var fieldCount = csv.Context.Parser.Record.Length;
+                if (fieldCount != expectedHeaders.Length)
+                {
+                    throw new InvalidOperationException($"Invalid number of fields in row {csv.Context.Parser.Row}.");
+                }
+
+                var productInfo = csv.GetRecord<ProductInfo>();
+                progressTracker.IncrementRead();
+
+                await channelWriter.WriteAsync(productInfo, cancellationToken);
+            }
         }
-
-        channelWriter.Complete();
+        finally
+        {
+            channelWriter.Complete();
+        }
     }
 
     private static long TotalLines(StreamReader reader)
@@ -42,6 +74,7 @@ public sealed class CsvFileReader(IProgressTracker progressTracker, string fileP
 
         var buffer = new char[8192]; // 16Kb
         int charsRead;
+        var isEmptyLine = false;
 
         while ((charsRead = reader.Read(buffer, 0, buffer.Length)) > 0)
         {
@@ -49,7 +82,16 @@ public sealed class CsvFileReader(IProgressTracker progressTracker, string fileP
             {
                 if (buffer[i] == '\n')
                 {
-                    counter++;
+                    if (!isEmptyLine)
+                    {
+                        counter++;
+                    }
+
+                    isEmptyLine = true;
+                }
+                else if (!char.IsWhiteSpace(buffer[i]))
+                {
+                    isEmptyLine = false;
                 }
             }
         }
