@@ -100,7 +100,9 @@ public sealed class ProductProcessService : IProductProcessService
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
+
             await productProcessWorker.ProcessAsync(productInfo, cancellationToken);
+            await Task.Delay(10, cancellationToken);
         }
         finally
         {
