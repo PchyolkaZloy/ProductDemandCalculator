@@ -18,7 +18,11 @@ public sealed class AppSettingsConfigValidator : AbstractValidator<AppSettingsCo
             .NotNull()
             .NotEmpty()
             .Must(File.Exists)
-            .WithMessage(c => $"Input file doesn't exist {c.InputFilePath}");
+            .WithMessage(c => $"Input file doesn't exist {c.InputFilePath}")
+            .Must((c, inputFilePath) =>
+                !Path.GetFullPath(inputFilePath)
+                    .Equals(Path.GetFullPath(c.OutputFilePath), StringComparison.OrdinalIgnoreCase))
+            .WithMessage("Input and output files must be different and should not have the same path.");
 
         RuleFor(c => c.OutputFilePath)
             .NotNull()
