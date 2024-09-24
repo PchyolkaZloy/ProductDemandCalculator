@@ -84,11 +84,6 @@ public sealed class ProgressScenario
             AnsiConsole.Markup($"[red]Error occurred: {ex.Message.EscapeMarkup()}[/]");
             await cts.CancelAsync();
         }
-
-        finally
-        {
-            await cts.CancelAsync();
-        }
     }
 
 
