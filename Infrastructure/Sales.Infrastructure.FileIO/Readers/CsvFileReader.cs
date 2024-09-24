@@ -28,7 +28,7 @@ public sealed class CsvFileReader(IProgressTracker progressTracker, string fileP
 
             var productInfo = csv.GetRecord<ProductInfo>();
             progressTracker.IncrementRead();
-            
+
             await channelWriter.WriteAsync(productInfo, cancellationToken);
         }
 
@@ -38,11 +38,20 @@ public sealed class CsvFileReader(IProgressTracker progressTracker, string fileP
     private static long TotalLines(StreamReader reader)
     {
         const int headerRows = 1;
-        var counter = 0;
+        long counter = 0;
 
-        while (reader.ReadLine() != null)
+        var buffer = new char[8192]; // 16Kb
+        int charsRead;
+
+        while ((charsRead = reader.Read(buffer, 0, buffer.Length)) > 0)
         {
-            counter++;
+            for (var i = 0; i < charsRead; i++)
+            {
+                if (buffer[i] == '\n')
+                {
+                    counter++;
+                }
+            }
         }
 
         reader.BaseStream.Seek(0, SeekOrigin.Begin);
