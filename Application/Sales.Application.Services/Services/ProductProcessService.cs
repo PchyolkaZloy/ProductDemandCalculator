@@ -14,6 +14,7 @@ public sealed class ProductProcessService : IProductProcessService
     private readonly IProductProcessWorker _productProcessWorker;
     private SemaphoreSlim _semaphore;
     private int _currentParallelismDegree;
+    private const int MaxParallelismDegree = 100;
 
     public ProductProcessService(
         IFileReader fileReader,
@@ -34,11 +35,9 @@ public sealed class ProductProcessService : IProductProcessService
     public async Task StartProcessingAsync(int parallelismDegree, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        
-        const int maxParallelismDegree = 100;
 
         _currentParallelismDegree = parallelismDegree;
-        _semaphore = new SemaphoreSlim(_currentParallelismDegree, maxParallelismDegree);
+        _semaphore = new SemaphoreSlim(_currentParallelismDegree, MaxParallelismDegree);
 
         var readTask = _fileReader.ReadProductInfosAsync(_channelProductInfo.Writer, cancellationToken);
         var writeTask = _fileWriter.WriteProductResultsAsync(_channelProductResult.Reader, cancellationToken);
@@ -70,11 +69,9 @@ public sealed class ProductProcessService : IProductProcessService
 
     public void UpdateParallelismDegree(int newParallelismDegree)
     {
-        const int maxParallelismDegree = 100;
-
-        if (newParallelismDegree is < 1 or > maxParallelismDegree)
+        if (newParallelismDegree is < 1 or > MaxParallelismDegree)
         {
-            newParallelismDegree = maxParallelismDegree;
+            newParallelismDegree = MaxParallelismDegree;
         }
 
         if (newParallelismDegree > _currentParallelismDegree)

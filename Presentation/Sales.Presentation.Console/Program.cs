@@ -24,7 +24,7 @@ public static class Program
         var configPath = args[0];
 
         IConfiguration configuration = new ConfigurationBuilder()
-            .AddJsonFile(configPath, optional: true, reloadOnChange: true)
+            .AddJsonFile(configPath, optional: false, reloadOnChange: true)
             .AddEnvironmentVariables()
             .Build();
 
