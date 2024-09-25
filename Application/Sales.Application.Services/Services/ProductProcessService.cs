@@ -47,7 +47,6 @@ public sealed class ProductProcessService : IProductProcessService
                 await foreach (var productInfo in _channelProductInfo.Reader.ReadAllAsync(cancellationToken))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    await _semaphore.WaitAsync(cancellationToken);
 
                     _ = CalculateProcessAsync(_productProcessWorker, productInfo, _semaphore, cancellationToken);
                 }
@@ -101,8 +100,10 @@ public sealed class ProductProcessService : IProductProcessService
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            await productProcessWorker.ProcessAsync(productInfo, cancellationToken);
-            await Task.Delay(10, cancellationToken);
+            await semaphore.WaitAsync(cancellationToken);
+            
+            await Task.Run(async () => await productProcessWorker.ProcessAsync(productInfo, cancellationToken),
+                cancellationToken);
         }
         finally
         {
